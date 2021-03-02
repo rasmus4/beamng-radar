@@ -15,6 +15,7 @@ angular.module('beamng.apps')
       var rectWidth = 10;
       var rectHeight = 20;
       var scaleFactor = 6;
+      var notSetUp = true;
 
       var c = element[0]
         , ctx = c.getContext('2d')
@@ -31,27 +32,42 @@ angular.module('beamng.apps')
         StreamsManager.remove(streamsList);
       });
 
+      scope.forceCarSelfReport = function() {
+        bngApi.engineLua("be:queueAllObjectLua(\"guihooks.trigger('_radarHookCarID', obj:getID())\")");
+        bngApi.engineLua("be:getPlayerVehicleID(0)", (id) => {
+          console.log("getPlayerVehicleID(0): " + id);
+          ownCarId = id;
+        });
+      }
+
       scope.updateRadar = function () {
         ctx.clearRect(0, 0, c.width, c.height);
         ctx.fillStyle = '#00ff00';
         let selfAng = Math.atan2(ownRotation.y, ownRotation.x) + Math.PI/2;
-        ctx.fillText("selfAng: " + selfAng.toFixed(2), 30, 30);
+        //ctx.fillText("selfAng: " + selfAng.toFixed(2), 30, 30);
         //ctx.rotate(selfAng);
         ctx.fillRect((c.width/2) - (rectHeight/2), (c.height/2) - (rectWidth/2), rectWidth, rectHeight);
         ctx.beginPath();
         ctx.strokeStyle = 'white';
         for (let key in positions) {
-          let deltaRotX = Math.cos(-selfAng) * (positions[key].x - ownPosition.x) - Math.sin(-selfAng) * (positions[key].y - ownPosition.y);
-          let deltaRotY = Math.sin(-selfAng) * (positions[key].x - ownPosition.x) + Math.cos(-selfAng) * (positions[key].y - ownPosition.y);
+          let cos = Math.cos(-selfAng);
+          let sin = Math.sin(-selfAng);
+          let deltaRotX = cos * (positions[key].x - ownPosition.x) - sin * (positions[key].y - ownPosition.y);
+          let deltaRotY = sin * (positions[key].x - ownPosition.x) + cos * (positions[key].y - ownPosition.y);
           if (Math.abs(deltaRotX*scaleFactor) < c.width/2 && Math.abs(deltaRotY*scaleFactor) < c.height/2) {
-            /*ctx.fillRect(
-              (c.width/2) - (rectHeight/2) - deltaRotX*scaleFactor,
-              (c.height/2) - (rectWidth/2) + deltaRotY*scaleFactor,
-              rectWidth,
-              rectHeight
-            );*/
-            ctx.moveTo((c.width/2) - (rectHeight/2) - deltaRotX*scaleFactor, (c.height/2) - (rectWidth/2) + deltaRotY*scaleFactor - rectHeight/2);
-            ctx.lineTo((c.width/2) - (rectHeight/2) - deltaRotX*scaleFactor, (c.height/2) - (rectWidth/2) + deltaRotY*scaleFactor + rectHeight/2);
+            let ang = Math.atan2(ownRotation.y, ownRotation.x) - Math.atan2(rotations[key].y, rotations[key].x);
+            let offsetX = - Math.sin(ang) * (rectHeight/2);
+            let offsetY = Math.cos(ang) * (rectHeight/2);
+            ctx.fillStyle = '#000000';
+            //ctx.fillText("x: " + deltaRotX.toFixed(2) + "; y: " + deltaRotY.toFixed(2), 30, 30);
+            ctx.moveTo(
+              (c.width/2) - deltaRotX*scaleFactor + offsetX - 5, // -5 to compensate for offset caused by stroke (?)
+              (c.height/2) + deltaRotY*scaleFactor + offsetY
+            );
+            ctx.lineTo(
+              (c.width/2) - deltaRotX*scaleFactor - offsetX - 5, // -5 to compensate for offset caused by stroke (?)
+              (c.height/2) + deltaRotY*scaleFactor - offsetY
+            );
             ctx.lineWidth = rectWidth;
             ctx.stroke();
           } else {
@@ -60,11 +76,7 @@ angular.module('beamng.apps')
       };
 
       scope.$on("VehicleChange", function() {
-        bngApi.engineLua("be:queueAllObjectLua(\"guihooks.trigger('_radarHookCarID', obj:getID())\")");
-        bngApi.engineLua("be:getPlayerVehicleID(0)", (id) => {
-          console.log("getPlayerVehicleID(0): " + id);
-          ownCarId = id;
-        });
+        scope.forceCarSelfReport();
         console.log("on VehicleChange")
       });
 
@@ -76,6 +88,10 @@ angular.module('beamng.apps')
       });
 
       scope.$on("streamsUpdate", function(_, _) {
+        if (notSetUp) {
+          scope.forceCarSelfReport();
+          notSetUp = false;
+        }
         if (carIds.length > 0) {
           let self = this;
           if (ownCarId == -1) return;
