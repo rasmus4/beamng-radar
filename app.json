@@ -1,0 +1,19 @@
+{
+  "domElement": "<radar></radar>",
+  "name": "Radar App",
+  "types": [
+    "ui.apps.categories.racing"
+  ],
+  "description": "Show car proximity",
+  "css": {
+    "left": "0px",
+    "height": "auto",
+    "width": "220px",
+    "min-width": "120px",
+    "min-height": "120px",
+    "top": "0px"
+  },
+  "author": "Rasmus L",
+  "version": "0.1",
+  "directive": "radar"
+}
