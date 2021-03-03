@@ -1,7 +1,7 @@
 angular.module('beamng.apps')
 .directive('radar', ['CanvasShortcuts', 'StreamsManager', 'bngApi', function (CanvasShortcuts, StreamsManager, bngApi) {
   return {
-    template: '<canvas width="180"></canvas>',
+    template: '<canvas width="180" height="180"></canvas>',
     replace: true,
     restrict: 'EA',
     link: function (scope, element, attrs) {

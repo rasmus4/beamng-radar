@@ -7,13 +7,13 @@
   "description": "Show car proximity",
   "css": {
     "left": "0px",
-    "height": "auto",
-    "width": "220px",
-    "min-width": "120px",
-    "min-height": "120px",
+    "height": "180px",
+    "width": "180px",
+    "min-width": "180px",
+    "min-height": "180px",
     "top": "0px"
   },
-  "author": "Rasmus L",
+  "author": "Rasmus",
   "version": "0.1",
   "directive": "radar"
 }
