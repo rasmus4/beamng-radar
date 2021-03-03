@@ -16,6 +16,7 @@ angular.module('beamng.apps')
       var rectHeight = 20;
       var scaleFactor = 6;
       var notSetUp = true;
+      var removeOldIds = false;
 
       var c = element[0];
       var ctx = c.getContext('2d');
@@ -32,9 +33,14 @@ angular.module('beamng.apps')
       });
 
       scope.forceCarSelfReport = function() {
+        carIds = [];
+        positions = {};
+        rotations = {};
+        ownPosition = null;
+        ownRotation = null;
+        ownCarId = -1;
         bngApi.engineLua("be:queueAllObjectLua(\"guihooks.trigger('_radarHookCarID', obj:getID())\")");
         bngApi.engineLua("be:getPlayerVehicleID(0)", (id) => {
-          console.log("getPlayerVehicleID(0): " + id);
           ownCarId = id;
         });
       }
@@ -51,7 +57,7 @@ angular.module('beamng.apps')
           let sin = Math.sin(-selfAng);
           let deltaRotX = cos * (positions[key].x - ownPosition.x) - sin * (positions[key].y - ownPosition.y);
           let deltaRotY = sin * (positions[key].x - ownPosition.x) + cos * (positions[key].y - ownPosition.y);
-          if (Math.abs(deltaRotX*scaleFactor) < c.width/2 && Math.abs(deltaRotY*scaleFactor) < c.height/2) {
+          if (Math.abs(deltaRotX*scaleFactor) < c.width && Math.abs(deltaRotY*scaleFactor) < c.height) {
             let ang = Math.atan2(ownRotation.y, ownRotation.x) - Math.atan2(rotations[key].y, rotations[key].x);
             let offsetX = - Math.sin(ang) * (rectHeight/2);
             let offsetY = Math.cos(ang) * (rectHeight/2);
@@ -81,21 +87,13 @@ angular.module('beamng.apps')
       };
 
       scope.$on("VehicleChange", function() {
-        carIds = [];
-        positions = {};
-        rotations = {};
-        ownPosition = null;
-        ownRotation = null;
-        ownCarId = -1;
         scope.forceCarSelfReport();
-        console.log("on VehicleChange")
       });
 
       scope.$on("_radarHookCarID", function(event, id) {
         console.log("_radarHookCarID");
         if (carIds.includes(id)) return;
         carIds.push(id);
-        console.log("pushed id '" + id + "'");
       });
 
       scope.$on("streamsUpdate", function(_, _) {
@@ -106,21 +104,30 @@ angular.module('beamng.apps')
         if (carIds.length > 0) {
           let self = this;
           if (ownCarId == -1) return;
-          for (var i = 0; i < carIds.length; i++) {
+          if (removeOldIds) {
+            scope.forceCarSelfReport();
+            removeOldIds = false;
+          }
+          for (let i = 0; i < carIds.length; i++) {
             let id = carIds[i];
-            bngApi.engineLua('{pos=vec3(be:getObjectByID(' + id + '):getPosition()), rot=vec3(be:getObjectByID(' + id + '):getDirectionVector())}', (response) => {
-              if (id == ownCarId) {
-                ownPosition = response.pos;
-                ownRotation = response.rot;
+            if (id == -1) continue;
+            bngApi.engineLua('(be:getObjectByID(' + id + ') ~= nil and {pos=vec3(be:getObjectByID(' + id + '):getPosition()), rot=vec3(be:getObjectByID(' + id + '):getDirectionVector())} or {error=1})', (response) => {
+              if (response && !response.hasOwnProperty("error")) {
+                if (id == ownCarId) {
+                  ownPosition = response.pos;
+                  ownRotation = response.rot;
+                } else {
+                  positions[id] = response.pos;
+                  rotations[id] = response.rot;
+                }
+                if (id == carIds[carIds.length - 1]) {
+                  scope.updateRadar();
+                }
               } else {
-                positions[id] = response.pos;
-                rotations[id] = response.rot;
-              }
-              /*console.log(response.pos.x + ", " + response.pos.y + ", " + response.pos.z + "; " +
-                response.rot.x + ", " + response.rot.y + ", " + response.rot.z
-              );*/
-              if (id == carIds[carIds.length - 1]) {
-                scope.updateRadar();
+                delete positions[id];
+                delete rotations[id];
+                carIds[i] = -1;
+                removeOldIds = true;
               }
             });
           }
