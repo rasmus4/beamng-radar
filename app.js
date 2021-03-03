@@ -43,7 +43,7 @@ angular.module('beamng.apps')
         ctx.clearRect(0, 0, c.width, c.height);
         ctx.fillStyle = '#00ff00';
         let selfAng = Math.atan2(ownRotation.y, ownRotation.x) + Math.PI/2;
-        ctx.fillRect((c.width/2) - (rectHeight/2), (c.height/2) - (rectWidth/2), rectWidth, rectHeight);
+        ctx.fillRect((c.width/2) - (rectWidth/2), (c.height/2) - (rectHeight/2), rectWidth, rectHeight);
         ctx.beginPath();
         ctx.strokeStyle = 'white';
         for (let key in positions) {
@@ -65,14 +65,13 @@ angular.module('beamng.apps')
               rectHeight
             );*/
 
-            // Magic +5 and -5 as stroke() doesn't seem to place the resulting rect properly
             ctx.moveTo(
-              (c.width/2) - deltaRotX*scaleFactor + offsetX - 5,
-              (c.height/2) + deltaRotY*scaleFactor + offsetY + 5
+              (c.width/2) - deltaRotX*scaleFactor + offsetX,
+              (c.height/2) + deltaRotY*scaleFactor + offsetY
             );
             ctx.lineTo(
-              (c.width/2) - deltaRotX*scaleFactor - offsetX - 5,
-              (c.height/2) + deltaRotY*scaleFactor - offsetY + 5
+              (c.width/2) - deltaRotX*scaleFactor - offsetX,
+              (c.height/2) + deltaRotY*scaleFactor - offsetY
             );
             ctx.lineWidth = rectWidth;
             ctx.stroke();
