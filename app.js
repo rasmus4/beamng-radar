@@ -17,9 +17,8 @@ angular.module('beamng.apps')
       var scaleFactor = 6;
       var notSetUp = true;
 
-      var c = element[0]
-        , ctx = c.getContext('2d')
-      ;
+      var c = element[0];
+      var ctx = c.getContext('2d');
 
       ctx.clearRect(0, 0, c.width, c.height);
       ctx.fillStyle = '#00ff00';
@@ -44,8 +43,6 @@ angular.module('beamng.apps')
         ctx.clearRect(0, 0, c.width, c.height);
         ctx.fillStyle = '#00ff00';
         let selfAng = Math.atan2(ownRotation.y, ownRotation.x) + Math.PI/2;
-        //ctx.fillText("selfAng: " + selfAng.toFixed(2), 30, 30);
-        //ctx.rotate(selfAng);
         ctx.fillRect((c.width/2) - (rectHeight/2), (c.height/2) - (rectWidth/2), rectWidth, rectHeight);
         ctx.beginPath();
         ctx.strokeStyle = 'white';
@@ -58,15 +55,24 @@ angular.module('beamng.apps')
             let ang = Math.atan2(ownRotation.y, ownRotation.x) - Math.atan2(rotations[key].y, rotations[key].x);
             let offsetX = - Math.sin(ang) * (rectHeight/2);
             let offsetY = Math.cos(ang) * (rectHeight/2);
-            ctx.fillStyle = '#000000';
-            //ctx.fillText("x: " + deltaRotX.toFixed(2) + "; y: " + deltaRotY.toFixed(2), 30, 30);
+
+            // debug rect (no rotation)
+            /*ctx.fillStyle = '#000000';
+            ctx.fillRect(
+              (c.width/2) - deltaRotX*scaleFactor - (rectHeight/2),
+              (c.height/2) + deltaRotY*scaleFactor - (rectWidth/2),
+              rectWidth,
+              rectHeight
+            );*/
+
+            // Magic +5 and -5 as stroke() doesn't seem to place the resulting rect properly
             ctx.moveTo(
-              (c.width/2) - deltaRotX*scaleFactor + offsetX - 5, // -5 to compensate for offset caused by stroke (?)
-              (c.height/2) + deltaRotY*scaleFactor + offsetY
+              (c.width/2) - deltaRotX*scaleFactor + offsetX - 5,
+              (c.height/2) + deltaRotY*scaleFactor + offsetY + 5
             );
             ctx.lineTo(
-              (c.width/2) - deltaRotX*scaleFactor - offsetX - 5, // -5 to compensate for offset caused by stroke (?)
-              (c.height/2) + deltaRotY*scaleFactor - offsetY
+              (c.width/2) - deltaRotX*scaleFactor - offsetX - 5,
+              (c.height/2) + deltaRotY*scaleFactor - offsetY + 5
             );
             ctx.lineWidth = rectWidth;
             ctx.stroke();
@@ -76,6 +82,12 @@ angular.module('beamng.apps')
       };
 
       scope.$on("VehicleChange", function() {
+        carIds = [];
+        positions = {};
+        rotations = {};
+        ownPosition = null;
+        ownRotation = null;
+        ownCarId = -1;
         scope.forceCarSelfReport();
         console.log("on VehicleChange")
       });
