@@ -41,7 +41,9 @@ angular.module('beamng.apps')
         ownCarId = -1;
         bngApi.engineLua("be:queueAllObjectLua(\"guihooks.trigger('_radarHookCarID', obj:getID())\")");
         bngApi.engineLua("be:getPlayerVehicleID(0)", (id) => {
-          ownCarId = id;
+          scope.$applyAsync(function () {
+            ownCarId = id;
+          });
         });
       }
 
@@ -90,10 +92,15 @@ angular.module('beamng.apps')
         scope.forceCarSelfReport();
       });
 
-      scope.$on("_radarHookCarID", function(event, id) {
-        console.log("_radarHookCarID");
-        if (carIds.includes(id)) return;
-        carIds.push(id);
+      scope.$on("_Radar_VehicleSwitch", function() {
+        scope.forceCarSelfReport();
+      });
+
+      scope.$on("_radarHookCarID", function(_, id) {
+        scope.$applyAsync(function () {
+          if (carIds.includes(id)) return;
+          carIds.push(id);
+        });
       });
 
       scope.$on("streamsUpdate", function(_, _) {
@@ -116,7 +123,7 @@ angular.module('beamng.apps')
                 if (id == ownCarId) {
                   ownPosition = response.pos;
                   ownRotation = response.rot;
-                } else {
+                } else if(carIds.includes(id)) { // Might have been removed before callback
                   positions[id] = response.pos;
                   rotations[id] = response.rot;
                 }
