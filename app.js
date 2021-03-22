@@ -5,7 +5,7 @@ angular.module('beamng.apps')
     replace: true,
     restrict: 'EA',
     link: function (scope, element, attrs) {
-      var streamsList = ['wheelInfo'];
+      var streamsList = ['sensors'];
       var carIds = [];
       var positions = {};
       var rotations = {};
@@ -45,7 +45,7 @@ angular.module('beamng.apps')
             ownCarId = id;
           });
         });
-      }
+      };
 
       scope.updateRadar = function () {
         ctx.clearRect(0, 0, c.width, c.height);
@@ -92,10 +92,6 @@ angular.module('beamng.apps')
         scope.forceCarSelfReport();
       });
 
-      scope.$on("_Radar_VehicleSwitch", function() {
-        scope.forceCarSelfReport();
-      });
-
       scope.$on("_radarHookCarID", function(_, id) {
         scope.$applyAsync(function () {
           if (carIds.includes(id)) return;
@@ -103,7 +99,14 @@ angular.module('beamng.apps')
         });
       });
 
-      scope.$on("streamsUpdate", function(_, _) {
+      scope.$on("streamsUpdate", function(event, data) {
+        if (data.sensors != null && ownPosition != null) {
+          let dx = Math.abs(ownPosition.x - data.sensors.position.x);
+          let dy = Math.abs(ownPosition.y - data.sensors.position.y);
+          if (dx > 3 || dy > 3) {
+            scope.forceCarSelfReport();
+          }
+        }
         if (notSetUp) {
           scope.forceCarSelfReport();
           notSetUp = false;
