@@ -12,14 +12,15 @@ angular.module('beamng.apps')
       var ownPosition = null;
       var ownRotation = null;
       var ownCarId = -1;
-      var rectWidth = 10;
-      var rectHeight = 20;
-      var scaleFactor = 6;
       var notSetUp = true;
       var removeOldIds = false;
 
       var c = element[0];
       var ctx = c.getContext('2d');
+
+      var rectWidth = c.width/18;
+      var rectHeight = c.width/9;
+      var scaleFactor = rectWidth * 0.6;
 
       ctx.clearRect(0, 0, c.width, c.height);
       ctx.fillStyle = '#00ff00';
@@ -142,6 +143,14 @@ angular.module('beamng.apps')
             });
           }
         }
+      });
+
+      scope.$on('app:resized', function (event, data) {
+        c.width = data.width;
+        c.height = data.height;
+        rectWidth = c.width/18;
+        rectHeight = c.width/9;
+        scaleFactor = rectWidth * 0.6;
       });
     }
   };
