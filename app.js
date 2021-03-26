@@ -7,13 +7,18 @@ angular.module('beamng.apps')
     link: function (scope, element, attrs) {
       var streamsList = ['sensors'];
       var carIds = [];
+      var carList = [];
       var positions = {};
+      var objectCount = 0
       var rotations = {};
+      var dimensions = {};
       var ownPosition = null;
       var ownRotation = null;
-      var ownCarId = -1;
+      var ownDimension = null;
+      var ownCarIdx = -1;
       var notSetUp = true;
       var removeOldIds = false;
+	  var detectOwnCar = false;
 
       var c = element[0];
       var ctx = c.getContext('2d');
@@ -32,48 +37,43 @@ angular.module('beamng.apps')
       scope.$on('$destroy', function () {
         StreamsManager.remove(streamsList);
       });
+    
 
-      scope.forceCarSelfReport = function() {
-        carIds = [];
-        positions = {};
-        rotations = {};
-        ownPosition = null;
-        ownRotation = null;
-        ownCarId = -1;
-        bngApi.engineLua("be:queueAllObjectLua(\"guihooks.trigger('_radarHookCarID', obj:getID())\")");
-        bngApi.engineLua("be:getPlayerVehicleID(0)", (id) => {
-          scope.$applyAsync(function () {
-            ownCarId = id;
-          });
-        });
-      };
-
-      scope.updateRadar = function () {
+      scope.updateRadar = function (count) {
+        if (count == 0 || notSetUp) return;
         ctx.clearRect(0, 0, c.width, c.height);
-        ctx.fillStyle = '#00ff00';
         let selfAng = Math.atan2(ownRotation.y, ownRotation.x) + Math.PI/2;
-        ctx.fillRect((c.width/2) - (rectWidth/2), (c.height/2) - (rectHeight/2), rectWidth, rectHeight);
         ctx.beginPath();
-        ctx.strokeStyle = 'white';
-        for (let key in positions) {
-          let cos = Math.cos(-selfAng);
+		let bestFitOwnCar = -1
+		let bestFitOwnCarDist = 10000
+        for (var key = 0; key < count; key++) {
+		  if (key == ownCarIdx ) continue
+          if( !positions[key]) continue;
+          ctx.strokeStyle = 'white';
+          //rectWidth = dimensions[key].w * scaleFactor
+          //rectHeight = dimensions[key].l * scaleFactor
+
+		  var dx = positions[key].x - ownPosition.x
+          var dy = positions[key].y - ownPosition.y
+	      if (ownCarIdx == -1) {
+		    var dist = dx * dx + dy * dy
+			if (dist < bestFitOwnCarDist) {
+				bestFitOwnCar = key;
+				bestFitOwnCarDist = dist
+			}
+		  }
+		  
+		  let cos = Math.cos(-selfAng);
           let sin = Math.sin(-selfAng);
-          let deltaRotX = cos * (positions[key].x - ownPosition.x) - sin * (positions[key].y - ownPosition.y);
-          let deltaRotY = sin * (positions[key].x - ownPosition.x) + cos * (positions[key].y - ownPosition.y);
+          let deltaRotX = cos * (dx) - sin * (dy);
+          let deltaRotY = sin * (dx) + cos * (dy);
           if (Math.abs(deltaRotX*scaleFactor) < c.width && Math.abs(deltaRotY*scaleFactor) < c.height) {
             let ang = Math.atan2(ownRotation.y, ownRotation.x) - Math.atan2(rotations[key].y, rotations[key].x);
-            let offsetX = - Math.sin(ang) * (rectHeight/2);
-            let offsetY = Math.cos(ang) * (rectHeight/2);
-
-            // debug rect (no rotation)
-            /*ctx.fillStyle = '#000000';
-            ctx.fillRect(
-              (c.width/2) - deltaRotX*scaleFactor - (rectHeight/2),
-              (c.height/2) + deltaRotY*scaleFactor - (rectWidth/2),
-              rectWidth,
-              rectHeight
-            );*/
-
+            let offsetX = - Math.sin(ang) * (rectHeight/2); 
+            let offsetY = Math.cos(ang) * (rectHeight/2) ; 
+            
+    
+            ctx.strokeStyle = 'white'
             ctx.moveTo(
               (c.width/2) - deltaRotX*scaleFactor + offsetX,
               (c.height/2) + deltaRotY*scaleFactor + offsetY
@@ -82,67 +82,91 @@ angular.module('beamng.apps')
               (c.width/2) - deltaRotX*scaleFactor - offsetX,
               (c.height/2) + deltaRotY*scaleFactor - offsetY
             );
+            
             ctx.lineWidth = rectWidth;
-            ctx.stroke();
-          } else {
-          }
+            
+        
+          } 
         }
+		if (bestFitOwnCar > -1) {
+			ownCarIdx = bestFitOwnCar
+		}
+        ctx.stroke();
+         ctx.beginPath();
+        ctx.strokeStyle = '#00ff00';
+        //rectWidth = ownDimension.w  * scaleFactor
+        //rectHeight = ownDimension.l * scaleFactor
+        
+        ctx.moveTo(
+              (c.width/2) ,
+              (c.height/2)- rectHeight/2
+            );
+        ctx.lineTo(
+          (c.width/2) ,
+          (c.height/2) + rectHeight/2
+        );
+        ctx.lineWidth = rectWidth ;
+        ctx.stroke();
+            
       };
-
-      scope.$on("VehicleChange", function() {
-        scope.forceCarSelfReport();
-      });
-
-      scope.$on("_radarHookCarID", function(_, id) {
-        scope.$applyAsync(function () {
-          if (carIds.includes(id)) return;
-          carIds.push(id);
+      var readVehicleData = function(event, data) {
+		  
+        bngApi.activeObjectLua("{pos=vec3(obj:getPosition()), rot=vec3(obj:getDirectionVector()),"
+            +'l=obj:getInitialLength(), w=obj:getInitialWidth()}', (response) => {
+            ownPosition = response.pos;
+            ownRotation = response.rot;
+            ownDimension = {l: response.l, w: response.w}
+			ownCarIdx = -1
         });
-      });
-
-      scope.$on("streamsUpdate", function(event, data) {
-        if (data.sensors != null && ownPosition != null) {
-          let dx = Math.abs(ownPosition.x - data.sensors.position.x);
-          let dy = Math.abs(ownPosition.y - data.sensors.position.y);
-          if (dx > 3 || dy > 3) {
-            scope.forceCarSelfReport();
-          }
-        }
-        if (notSetUp) {
-          scope.forceCarSelfReport();
-          notSetUp = false;
-        }
-        if (carIds.length > 0) {
-          let self = this;
-          if (ownCarId == -1) return;
-          if (removeOldIds) {
-            scope.forceCarSelfReport();
-            removeOldIds = false;
-          }
-          for (let i = 0; i < carIds.length; i++) {
-            let id = carIds[i];
-            if (id == -1) continue;
-            bngApi.engineLua('(be:getObjectByID(' + id + ') ~= nil and {pos=vec3(be:getObjectByID(' + id + '):getPosition()), rot=vec3(be:getObjectByID(' + id + '):getDirectionVector())} or {error=1})', (response) => {
+          bngApi.engineLua("be:getObjectCount()", (count) => {
+              objectCount = count;
+                for (let i = 0; i < objectCount; i++) {
+      //   
+            bngApi.engineLua('{pos=vec3(be:getObject(' + i + '):getPosition()), rot=vec3(be:getObject(' + i + '):getDirectionVector()),'
+            +'l=be:getObject(' + i + '):getInitialLength(), w=be:getObject(' + i + '):getInitialWidth()}', function(idx) { return function(response)  {
               if (response && !response.hasOwnProperty("error")) {
-                if (id == ownCarId) {
-                  ownPosition = response.pos;
-                  ownRotation = response.rot;
-                } else if(carIds.includes(id)) { // Might have been removed before callback
-                  positions[id] = response.pos;
-                  rotations[id] = response.rot;
-                }
-                if (id == carIds[carIds.length - 1]) {
-                  scope.updateRadar();
-                }
-              } else {
-                delete positions[id];
-                delete rotations[id];
-                carIds[i] = -1;
-                removeOldIds = true;
-              }
-            });
+                  positions[idx] = response.pos;
+                  rotations[idx] = response.rot;
+                  dimensions[idx] = {l: response.l, w: response.w}
+				
+              } 
+             }}(i));
+            }
+          
+          })
+          notSetUp = false;
+      }
+      
+        scope.$on("VehicleFocusChanged", readVehicleData);
+        scope.$on("VehicleReset", readVehicleData);
+        scope.$on("VehicleconfigSaved", readVehicleData);
+        scope.$on("VehicleconfigChange", readVehicleData);
+        scope.$on("VehicleChangeColor", readVehicleData);
+        scope.$on("VehicleChange", readVehicleData);
+        scope.$on("streamsUpdate", function(event, data) {
+
+   
+          
+       bngApi.activeObjectLua("{pos=vec3(obj:getPosition()), rot=vec3(obj:getDirectionVector())}", (response) => {
+            ownPosition = response.pos;
+            ownRotation = response.rot;
+            
+        });
+          
+
+              for (let i = 0; i < objectCount; i++) {
+      //  l=be:getObject(' + i + '):getInitialLength(), w=be:getObject(' + i + '):getInitialWidth() 
+            bngApi.engineLua('{pos=vec3(be:getObject(' + i + '):getPosition()), rot=vec3(be:getObject(' + i + '):getDirectionVector())}', function(idx) { return function(response)  {
+              if (response && !response.hasOwnProperty("error")) {
+                  positions[idx] = response.pos;
+                  rotations[idx] = response.rot;
+              } 
+             }}(i));
           }
-        }
+    
+        scope.updateRadar(objectCount);
+       
+        
       });
 
       scope.$on('app:resized', function (event, data) {
@@ -152,6 +176,7 @@ angular.module('beamng.apps')
         rectHeight = c.width/9;
         scaleFactor = rectWidth * 0.6;
       });
-    }
+	  readVehicleData();
+	}
   };
 }]);
