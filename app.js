@@ -15,9 +15,10 @@ angular.module('beamng.apps')
       var ownPosition = null;
       var ownRotation = null;
       var ownDimension = null;
-      var ownCarId = -1;
+      var ownCarIdx = -1;
       var notSetUp = true;
       var removeOldIds = false;
+	  var detectOwnCar = false;
 
       var c = element[0];
       var ctx = c.getContext('2d');
@@ -43,15 +44,29 @@ angular.module('beamng.apps')
         ctx.clearRect(0, 0, c.width, c.height);
         let selfAng = Math.atan2(ownRotation.y, ownRotation.x) + Math.PI/2;
         ctx.beginPath();
+		let bestFitOwnCar = -1
+		let bestFitOwnCarDist = 10000
         for (var key = 0; key < count; key++) {
+		  if (key == ownCarIdx ) continue
           if( !positions[key]) continue;
           ctx.strokeStyle = 'white';
           //rectWidth = dimensions[key].w * scaleFactor
           //rectHeight = dimensions[key].l * scaleFactor
-          let cos = Math.cos(-selfAng);
+
+		  var dx = positions[key].x - ownPosition.x
+          var dy = positions[key].y - ownPosition.y
+	      if (ownCarIdx == -1) {
+		    var dist = dx * dx + dy * dy
+			if (dist < bestFitOwnCarDist) {
+				bestFitOwnCar = key;
+				bestFitOwnCarDist = dist
+			}
+		  }
+		  
+		  let cos = Math.cos(-selfAng);
           let sin = Math.sin(-selfAng);
-          let deltaRotX = cos * (positions[key].x - ownPosition.x) - sin * (positions[key].y - ownPosition.y);
-          let deltaRotY = sin * (positions[key].x - ownPosition.x) + cos * (positions[key].y - ownPosition.y);
+          let deltaRotX = cos * (dx) - sin * (dy);
+          let deltaRotY = sin * (dx) + cos * (dy);
           if (Math.abs(deltaRotX*scaleFactor) < c.width && Math.abs(deltaRotY*scaleFactor) < c.height) {
             let ang = Math.atan2(ownRotation.y, ownRotation.x) - Math.atan2(rotations[key].y, rotations[key].x);
             let offsetX = - Math.sin(ang) * (rectHeight/2); 
@@ -73,6 +88,9 @@ angular.module('beamng.apps')
         
           } 
         }
+		if (bestFitOwnCar > -1) {
+			ownCarIdx = bestFitOwnCar
+		}
         ctx.stroke();
          ctx.beginPath();
         ctx.strokeStyle = '#00ff00';
@@ -92,11 +110,13 @@ angular.module('beamng.apps')
             
       };
       var readVehicleData = function(event, data) {
+		  
         bngApi.activeObjectLua("{pos=vec3(obj:getPosition()), rot=vec3(obj:getDirectionVector()),"
             +'l=obj:getInitialLength(), w=obj:getInitialWidth()}', (response) => {
             ownPosition = response.pos;
             ownRotation = response.rot;
             ownDimension = {l: response.l, w: response.w}
+			ownCarIdx = -1
         });
           bngApi.engineLua("be:getObjectCount()", (count) => {
               objectCount = count;
@@ -108,6 +128,7 @@ angular.module('beamng.apps')
                   positions[idx] = response.pos;
                   rotations[idx] = response.rot;
                   dimensions[idx] = {l: response.l, w: response.w}
+				
               } 
              }}(i));
             }
